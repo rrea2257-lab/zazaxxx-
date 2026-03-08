@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+
+  <head>
+    <meta charset="UTF-8">
+    <title>Untitled</title>
+    
+
+  </head>
+    
+  <body>
+  <!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Function Defender: Mobile Edition</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.8.0/math.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --primary-color: #38bdf8;
+            --primary-dim: rgba(56, 189, 248, 0.5);
+            --secondary-color: #10b981;
+            --panel-bg: #1e293b;
+            --font-main: 'Courier New', Courier, monospace;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--primary-color);
+            font-family: var(--font-main);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 0;
+            padding: 5px; /* ลด padding ให้ชิดขอบมือถือขึ้น */
+            box-sizing: border-box;
+            overflow-x: hidden;
+            touch-action: pan-y; /* ป้องกันการดึงจอหรือซูมมั่วซั่ว */
+        }
+
+        /* --- หน้าจอเริ่มเกม --- */
+        #startScreen {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: var(--bg-color);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            z-index: 100; padding: 20px; box-sizing: border-box;
+        }
+        #startScreen.hidden { display: none; }
+        
+        .game-title { font-size: 2rem; color: #7dd3fc; text-align: center; margin-bottom: 10px; text-shadow: 0 0 10px var(--primary-color); }
+        .start-btn {
+            width: 100%; max-width: 300px; padding: 15px; font-size: 1.2rem;
+            background-color: var(--secondary-color); color: white; border: none;
+            border-radius: 8px; cursor: pointer; font-weight: bold; margin-top: 20px;
+        }
+
+        /* --- หน้าจอเล่นเกม --- */
+        #mainGame { 
+            display: none; flex-direction: column; align-items: center; 
+            width: 100%; max-width: 500px; /* จำกัดความกว้างไม่ให้ใหญ่เกินไป */
+        }
+        #mainGame.visible { display: flex; }
+        
+        .score-board {
+            display: flex; justify-content: space-between; width: 100%; 
+            margin-bottom: 5px; font-size: 0.85rem; background-color: var(--panel-bg); 
+            padding: 8px; border-radius: 6px; box-sizing: border-box; border: 1px solid #475569;
+        }
+
+        /* ปรับ Canvas ให้เป็นจัตุรัส */
+        #gameArea { width: 100%; margin-bottom: 10px; }
+        canvas { 
+            background-color: #020617; border: 2px solid var(--primary-color); 
+            border-radius: 8px; width: 100%; height: auto; 
+            aspect-ratio: 1 / 1; /* บังคับให้เป็นจัตุรัส 1:1 */
+            display: block; box-shadow: 0 0 10px var(--primary-dim);
+        }
+
+        .controls { width: 100%; display: flex; flex-direction: column; gap: 8px; }
+
+        .input-group { display: flex; gap: 5px; }
+        
+        input[type="text"] {
+            flex-grow: 1; padding: 12px; font-size: 1.2rem; 
+            background-color: var(--panel-bg); color: var(--secondary-color);
+            border: 1px solid var(--primary-color); border-radius: 8px; 
+            text-align: center; font-weight: bold;
+        }
+        
+        button.fire-btn {
+            padding: 0 20px; font-size: 1.2rem; background-color: #0ea5e9; 
+            color: white; border: none; border-radius: 8px; font-weight: bold;
+        }
+
+        /* --- แผงปุ่มคีย์ลัดสำหรับมือถือ --- */
+        .quick-keys {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr); /* 5 คอลัมน์ */
+            gap: 5px;
+            width: 100%;
+        }
+        .quick-keys button {
+            background-color: #334155; color: #e2e8f0; border: 1px solid #475569;
+            padding: 10px 0; font-size: 1rem; border-radius: 6px; font-family: var(--font-main);
+            cursor: pointer;
+        }
+        .quick-keys button.var-btn { background-color: #0f766e; color: white; font-weight: bold; }
+        .quick-keys button.action-btn { background-color: #991b1b; color: white; }
+
+        #message { margin-top: 10px; font-size: 1rem; font-weight: bold; text-align: center; height: 24px; }
+    </style>
+</head>
+<body>
+
+    <div id="startScreen">
+        <div class="game-title">🖥️ FUNCTION<br>DEFENDER</div>
+        <div style="color: #94a3b8; text-align: center; margin-bottom: 20px;">[ Mobile Edition ]</div>
+        <div style="background: #1e293b; padding: 15px; border-radius: 8px; font-size: 0.9rem; width: 100%; box-sizing: border-box;">
+            เป้าหมาย: ทำลายไวรัสสีแดง<br><br>
+            ใช้ปุ่มลัดด้านล่าง หรือพิมพ์สมการ y = f(x) เช่น <strong>-0.5*x^2 + 15</strong> เพื่อยิงเลเซอร์สีเขียว
+        </div>
+        <button id="startGameBtn" class="start-btn">▶ เริ่มเกม</button>
+    </div>
+
+    <div id="mainGame">
+        <div class="score-board">
+            <span>Score: <span id="score" style="color:white; font-weight:bold;">0</span></span>
+            <span>สถานะ: <span id="gameStatus" style="color:var(--secondary-color)">ออนไลน์</span></span>
+            <span>ฐาน: (0,0)</span>
+        </div>
+        
+        <div id="gameArea">
+            <canvas id="gameCanvas" width="600" height="600"></canvas>
+        </div>
+        
+        <div class="controls">
+            <div class="input-group">
+                <input type="text" id="equation" placeholder="y =" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false">
+                <button id="fireBtn" class="fire-btn">🔥</button>
+            </div>
+            
+            <div class="quick-keys">
+                <button class="var-btn" onclick="addText('x')">x</button>
+                <button onclick="addText('^2')">^2</button>
+                <button onclick="addText('+')">+</button>
+                <button onclick="addText('-')">-</button>
+                <button onclick="addText('*')">*</button>
+                
+                <button onclick="addText('sin(')">sin</button>
+                <button onclick="addText('cos(')">cos</button>
+                <button onclick="addText('/')">/</button>
+                <button onclick="addText('(')">(</button>
+                <button onclick="addText(')')">)</button>
+
+                <button onclick="addText('0')">0</button>
+                <button onclick="addText('1')">1</button>
+                <button onclick="addText('2')">2</button>
+                <button onclick="addText('3')">3</button>
+                <button onclick="addText('4')">4</button>
+
+                <button onclick="addText('5')">5</button>
+                <button onclick="addText('6')">6</button>
+                <button onclick="addText('7')">7</button>
+                <button onclick="addText('8')">8</button>
+                <button onclick="addText('9')">9</button>
+
+                <button onclick="addText('.')">.</button>
+                <button class="action-btn" onclick="backspace()" style="grid-column: span 2;">⌫ ลบ</button>
+                <button class="action-btn" onclick="clearText()" style="grid-column: span 2; background-color: #b45309;">ล้างทั้งหมด</button>
+            </div>
+        </div>
+        
+        <div id="message">รอคำสั่งยิง...</div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreElement = document.getElementById('score');
+        const messageElement = document.getElementById('message');
+        const equationInput = document.getElementById('equation');
+        
+        // คำนวณ Scale ใหม่สำหรับจอ 600x600
+        const scale = 30; // กว้าง 600 = x ตั้งแต่ -10 ถึง 10
+        const originX = canvas.width / 2; // 300
+        const originY = canvas.height - 40; // 560 ฐานอยู่เกือบล่างสุด
+        
+        let score = 0;
+        let virus = { x: 0, y: 0, active: false };
+        let isGameRunning = false;
+        
+        let particles = [];
+        let floatingTexts = [];
+        let lasers = []; 
+        let shakeAmount = 0;
+
+        // --- ระบบพิมพ์สมการผ่านปุ่มลัด ---
+        function addText(text) {
+            equationInput.value += text;
+            equationInput.focus();
+        }
+        function backspace() {
+            equationInput.value = equationInput.value.slice(0, -1);
+            equationInput.focus();
+        }
+        function clearText() {
+            equationInput.value = '';
+            equationInput.focus();
+        }
+
+        // --- พิกัดหน้าจอ ---
+        function mapX(x) { return originX + (x * scale); }
+        function mapY(y) { return originY - (y * scale); } 
+
+        function spawnVirus() {
+            if(!isGameRunning) return;
+            virus.x = Math.floor(Math.random() * 16) - 8; // X แคบลงให้พอดีจอ
+            if(virus.x === 0) virus.x = 2; 
+            virus.y = Math.floor(Math.random() * 10) + 4; // Y อยู่ระหว่าง 4 ถึง 14
+            virus.active = true;
+            messageElement.innerText = `📡 ไวรัสพิกัด (${virus.x}, ${virus.y})`;
+            messageElement.style.color = '#ef4444';
+        }
+
+        function fireLaser() {
+            if(!isGameRunning) return;
+            const eqString = equationInput.value;
+            if (!eqString) return;
+
+            let isHit = false;
+            let startX = -canvas.width/2 / scale;
+            let endX = canvas.width/2 / scale;
+            let currentLaserPoints = [];
+            
+            try {
+                const node = math.parse(eqString);
+                const code = node.compile();
+
+                for (let x = startX; x <= endX; x += 0.05) {
+                    let y = code.evaluate({ x: x });
+                    if(!isFinite(y)) continue;
+
+                    let px = mapX(x);
+                    let py = mapY(y);
+
+                    if(py < -50 || py > canvas.height + 50) continue;
+                    currentLaserPoints.push({x: px, y: py});
+
+                    if (virus.active) {
+                        let dist = Math.sqrt(Math.pow(x - virus.x, 2) + Math.pow(y - virus.y, 2));
+                        if (dist < 0.6) isHit = true;
+                    }
+                }
+
+                lasers.push({ points: currentLaserPoints, life: 1.0 });
+
+                if (isHit) {
+                    messageElement.innerText = "💥 ไวรัสถูกทำลาย!";
+                    messageElement.style.color = '#10b981';
+                    virus.active = false;
+                    score += 10;
+                    scoreElement.innerText = score;
+                    
+                    createExplosion(mapX(virus.x), mapY(virus.y));
+                    setTimeout(spawnVirus, 1500);
+                    equationInput.value = ''; // เคลียร์ช่อง
+                } else {
+                    messageElement.innerText = "📡 พลาดเป้า...";
+                    messageElement.style.color = '#f59e0b';
+                }
+
+            } catch (error) {
+                messageElement.innerText = "⚠️ รูปแบบสมการผิดพลาด";
+                messageElement.style.color = '#ef4444';
+            }
+        }
+
+        function createExplosion(x, y) {
+            shakeAmount = 10; 
+            for(let i=0; i<30; i++) {
+                particles.push({
+                    x: x, y: y,
+                    vx: (Math.random() - 0.5) * 10, vy: (Math.random() - 0.5) * 10,
+                    life: 1.0, color: Math.random() > 0.5 ? '#ef4444' : '#f59e0b',
+                    size: Math.random() * 3 + 1
+                });
+            }
+            floatingTexts.push({ x: x, y: y - 20, text: "+10", life: 1.0 });
+        }
+
+        function gameLoop() {
+            if(!isGameRunning) return;
+            requestAnimationFrame(gameLoop);
+
+            if (shakeAmount > 0) shakeAmount *= 0.8; 
+            if (shakeAmount < 0.5) shakeAmount = 0;
+
+            particles.forEach(p => { p.x += p.vx; p.y += p.vy; p.vy += 0.2; p.life -= 0.03; });
+            particles = particles.filter(p => p.life > 0);
+
+            lasers.forEach(l => l.life -= 0.04); 
+            lasers = lasers.filter(l => l.life > 0);
+
+            floatingTexts.forEach(ft => { ft.y -= 1; ft.life -= 0.02; });
+            floatingTexts = floatingTexts.filter(ft => ft.life > 0);
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.save();
+            
+            if (shakeAmount > 0) {
+                let dx = (Math.random() - 0.5) * shakeAmount;
+                let dy = (Math.random() - 0.5) * shakeAmount;
+                ctx.translate(dx, dy);
+            }
+
+            drawGrid();
+            drawVirus();
+
+            lasers.forEach(laser => {
+                ctx.beginPath();
+                ctx.strokeStyle = `rgba(16, 185, 129, ${laser.life})`; 
+                ctx.lineWidth = 4 * laser.life;
+                for(let i=0; i<laser.points.length; i++) {
+                    let pt = laser.points[i];
+                    if (i === 0) ctx.moveTo(pt.x, pt.y);
+                    else ctx.lineTo(pt.x, pt.y);
+                }
+                ctx.stroke();
+            });
+
+            particles.forEach(p => {
+                ctx.globalAlpha = p.life;
+                ctx.fillStyle = p.color;
+                ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI*2); ctx.fill();
+            });
+            
+            floatingTexts.forEach(ft => {
+                ctx.globalAlpha = ft.life;
+                ctx.fillStyle = '#10b981';
+                ctx.font = 'bold 24px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText(ft.text, ft.x, ft.y);
+            });
+            ctx.globalAlpha = 1.0;
+            ctx.restore();
+        }
+
+        function drawGrid() {
+            ctx.strokeStyle = '#1e293b'; ctx.lineWidth = 1; ctx.beginPath();
+            for(let i = 0; i < canvas.width; i += scale) { ctx.moveTo(i, 0); ctx.lineTo(i, canvas.height); }
+            for(let i = 0; i < canvas.height; i += scale) { ctx.moveTo(0, i); ctx.lineTo(canvas.width, i); }
+            ctx.stroke();
+
+            ctx.strokeStyle = '#475569'; ctx.lineWidth = 2; ctx.beginPath(); 
+            ctx.moveTo(0, originY); ctx.lineTo(canvas.width, originY);
+            ctx.moveTo(originX, 0); ctx.lineTo(originX, canvas.height);
+            ctx.stroke();
+
+            ctx.fillStyle = '#94a3b8'; ctx.font = '14px Courier New'; ctx.textAlign = 'center';
+            for(let x = -10; x <= 10; x += 2) {
+                if(x !== 0) ctx.fillText(x, mapX(x), originY + 20);
+            }
+
+            ctx.fillStyle = '#3b82f6'; ctx.beginPath(); ctx.arc(originX, originY, 8, 0, Math.PI * 2); ctx.fill();
+        }
+
+        function drawVirus() {
+            if (!virus.active) return;
+            const px = mapX(virus.x);
+            const py = mapY(virus.y);
+            const pulse = Math.sin(Date.now() * 0.005) * 2;
+            
+            ctx.fillStyle = '#ef4444'; ctx.beginPath(); ctx.arc(px, py, 10 + pulse, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = '#fee2e2'; ctx.beginPath(); ctx.arc(px, py, 4 + (pulse/2), 0, Math.PI * 2); ctx.fill();
+
+            ctx.strokeStyle = '#fca5a5'; ctx.lineWidth = 2;
+            const spikes = 6; const time = Date.now() * 0.002; 
+            for(let i=0; i<spikes; i++) {
+                let angle = (Math.PI * 2 / spikes) * i + time;
+                ctx.beginPath(); ctx.moveTo(px, py);
+                ctx.lineTo(px + Math.cos(angle)*(18+pulse), py + Math.sin(angle)*(18+pulse));
+                ctx.stroke();
+            }
+        }
+
+        document.getElementById('startGameBtn').addEventListener('click', () => {
+            document.getElementById('startScreen').style.display = 'none';
+            document.getElementById('mainGame').classList.add('visible');
+            isGameRunning = true;
+            spawnVirus();
+            gameLoop();
+        });
+
+        document.getElementById('fireBtn').addEventListener('click', fireLaser);
+        equationInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') fireLaser(); });
+
+    </script>
+</body>
+</html>
+    
+  </body>
+  
+</html>
